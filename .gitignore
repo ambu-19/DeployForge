@@ -1,0 +1,31 @@
+.env
+node_modules/
+dist/
+__pycache__/
+*.tfstate*
+.terraform/
+
+# Environment secrets
+.env.*
+!.env.example
+
+# Python virtual environments
+.venv/
+venv/
+
+# Python testing
+.pytest_cache/
+.ruff_cache/
+
+# Frontend build
+build/
+
+# Logs
+*.log
+
+# IDE
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
