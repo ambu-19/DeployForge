@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from .config import settings
@@ -32,6 +32,11 @@ class Project(Base):
     port: Mapped[int] = mapped_column(Integer, default=8080)
     health_path: Mapped[str] = mapped_column(String(200), default="/")
     webhook_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    framework: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    custom_dockerfile: Mapped[str | None] = mapped_column(Text, nullable=True)
+    build_cmd: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    start_cmd: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    root_dir: Mapped[str] = mapped_column(String(200), default="")
 
 
 class EnvVar(Base):
@@ -60,6 +65,19 @@ class Deployment(Base):
 
 def init_db():
     Base.metadata.create_all(engine)
+    with engine.connect() as conn:
+        for col, col_type in [
+            ("framework", "VARCHAR(50)"),
+            ("custom_dockerfile", "TEXT"),
+            ("build_cmd", "VARCHAR(200)"),
+            ("start_cmd", "VARCHAR(200)"),
+            ("root_dir", "VARCHAR(200) DEFAULT ''"),
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE projects ADD COLUMN IF NOT EXISTS {col} {col_type};"))
+                conn.commit()
+            except Exception:
+                pass
 
 
 def get_db():
