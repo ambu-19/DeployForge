@@ -1,8 +1,8 @@
 import json
-from pathlib import Path
 
-from app.detect import detect, get_template
+from app.detect import detect
 from app.security import decrypt, encrypt, make_token, read_token
+from app.tunnel import extract_url_from_logs, get_container_name
 
 
 def test_detect_node(tmp_path):
@@ -135,4 +135,23 @@ def test_detect_monorepo(tmp_path):
     assert client_app["recommended_port"] == 80
     assert server_app["framework"] == "FastAPI"
     assert server_app["recommended_port"] == 8000
+
+
+def test_tunnel_container_name():
+    assert get_container_name("my-app") == "df-tunnel-my-app"
+
+
+def test_tunnel_url_extraction():
+    sample_logs = (
+        "2026-11-19T15:29:16Z INF +--------------------------------------------------------------------------------------------+\n"
+        "2026-11-19T15:29:16Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |\n"
+        "2026-11-19T15:29:16Z INF |  https://announces-greg-celebs-daisy.trycloudflare.com                                     |\n"
+        "2026-11-19T15:29:16Z INF +--------------------------------------------------------------------------------------------+\n"
+    )
+    url = extract_url_from_logs(sample_logs)
+    assert url == "https://announces-greg-celebs-daisy.trycloudflare.com"
+
+    no_url_logs = "Starting tunnel...\nWaiting for connection..."
+    assert extract_url_from_logs(no_url_logs) is None
+
 

@@ -8,7 +8,6 @@ import re
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import docker
 import httpx
@@ -23,9 +22,10 @@ from sqlalchemy import func
 
 from .config import settings
 from .db import Deployment, EnvVar, Project, SessionLocal, User, get_db, init_db
-from .detect import DEFAULT_DOCKERIGNORE, detect, get_template
+from .detect import get_template
 from .routing import remove_route, write_platform_routes
 from .security import encrypt, make_token, read_token
+from .tunnel import get_tunnel_status, restart_tunnel, start_tunnel, stop_tunnel
 
 app = FastAPI(title="DeployForge - Mini PaaS")
 rds = redis.Redis.from_url(settings.redis_url, decode_responses=True)
@@ -209,6 +209,9 @@ def project_out(p: Project, db):
         "custom_dockerfile": p.custom_dockerfile,
         "build_cmd": p.build_cmd,
         "start_cmd": p.start_cmd,
+        "deployment_mode": getattr(p, "deployment_mode", "local") or "local",
+        "public_url": getattr(p, "public_url", None),
+        "tunnel_status": getattr(p, "tunnel_status", "disconnected") or "disconnected",
         "url": f"{settings.app_scheme}://{p.slug}.{settings.domain}{settings.url_suffix}",
         "live_deployment": live.id if live else None,
         "latest_status": latest.status if latest else "none",
@@ -228,6 +231,7 @@ class ProjectIn(BaseModel):
     build_cmd: str | None = None
     start_cmd: str | None = None
     root_dir: str | None = ""
+    deployment_mode: str | None = "local"
 
 
 class ProjectUpdate(BaseModel):
@@ -240,6 +244,7 @@ class ProjectUpdate(BaseModel):
     build_cmd: str | None = None
     start_cmd: str | None = None
     root_dir: str | None = None
+    deployment_mode: str | None = None
 
 
 def new_deployment(db, p: Project, kind="manual", image=None, sha="", msg="") -> Deployment:
@@ -272,6 +277,7 @@ def create_project(body: ProjectIn, user=Depends(current_user), db=Depends(get_d
         build_cmd=body.build_cmd,
         start_cmd=body.start_cmd,
         root_dir=(body.root_dir or "").strip("/\\"),
+        deployment_mode=body.deployment_mode or "local",
     )
 
     if user.gh_token and "localhost" not in settings.public_url:
@@ -334,6 +340,11 @@ def update_project(pid: int, body: ProjectUpdate, user=Depends(current_user), db
         p.start_cmd = body.start_cmd
     if body.root_dir is not None:
         p.root_dir = body.root_dir.strip("/\\")
+    if body.deployment_mode is not None:
+        p.deployment_mode = body.deployment_mode
+        if body.deployment_mode == "local":
+            stop_tunnel(p.slug)
+            p.tunnel_status = "disconnected"
     db.commit()
     return project_out(p, db)
 
@@ -341,6 +352,7 @@ def update_project(pid: int, body: ProjectUpdate, user=Depends(current_user), db
 @app.delete("/api/projects/{pid}", status_code=204)
 def delete_project(pid: int, user=Depends(current_user), db=Depends(get_db)):
     p = own(db, user, pid)
+    stop_tunnel(p.slug)
     d = docker.from_env()
     for c in d.containers.list(all=True, filters={"label": f"df.project={p.slug}"}):
         c.remove(force=True)
@@ -364,6 +376,92 @@ def delete_project(pid: int, user=Depends(current_user), db=Depends(get_db)):
 def deploy_now(pid: int, user=Depends(current_user), db=Depends(get_db)):
     p = own(db, user, pid)
     return {"id": new_deployment(db, p, msg="Manual deploy").id}
+
+
+@app.post("/api/projects/{pid}/deploy/local")
+def deploy_local(pid: int, user=Depends(current_user), db=Depends(get_db)):
+    p = own(db, user, pid)
+    p.deployment_mode = "local"
+    stop_tunnel(p.slug)
+    p.tunnel_status = "disconnected"
+    db.commit()
+    d = new_deployment(db, p, msg="Deploy (Local mode)")
+    return {"id": d.id, "deployment_mode": "local"}
+
+
+@app.post("/api/projects/{pid}/deploy/public")
+def deploy_public(pid: int, user=Depends(current_user), db=Depends(get_db)):
+    p = own(db, user, pid)
+    p.deployment_mode = "public"
+    db.commit()
+    d = new_deployment(db, p, msg="Deploy (Public mode with Cloudflare Tunnel)")
+    return {"id": d.id, "deployment_mode": "public"}
+
+
+@app.get("/api/projects/{pid}/tunnel")
+def get_tunnel(pid: int, user=Depends(current_user), db=Depends(get_db)):
+    p = own(db, user, pid)
+    st = get_tunnel_status(p.slug)
+    if st["status"] == "connected" and st["public_url"]:
+        p.public_url = st["public_url"]
+        p.tunnel_status = "connected"
+        db.commit()
+    elif st["status"] == "disconnected" and p.tunnel_status != "disconnected":
+        p.tunnel_status = "disconnected"
+        db.commit()
+    return {
+        "project_id": p.id,
+        "slug": p.slug,
+        "deployment_mode": p.deployment_mode,
+        "public_url": p.public_url,
+        "tunnel_status": p.tunnel_status,
+        "live_status": st["status"],
+        "container_id": st["container_id"],
+    }
+
+
+@app.post("/api/projects/{pid}/tunnel/start")
+def start_project_tunnel(pid: int, user=Depends(current_user), db=Depends(get_db)):
+    p = own(db, user, pid)
+    url, status = start_tunnel(p.slug)
+    p.deployment_mode = "public"
+    p.tunnel_status = status
+    if url:
+        p.public_url = url
+    db.commit()
+    return {
+        "status": status,
+        "public_url": p.public_url,
+        "deployment_mode": p.deployment_mode,
+    }
+
+
+@app.post("/api/projects/{pid}/tunnel/stop")
+def stop_project_tunnel(pid: int, user=Depends(current_user), db=Depends(get_db)):
+    p = own(db, user, pid)
+    stopped = stop_tunnel(p.slug)
+    p.tunnel_status = "disconnected"
+    db.commit()
+    return {
+        "stopped": stopped,
+        "tunnel_status": "disconnected",
+    }
+
+
+@app.post("/api/projects/{pid}/tunnel/restart")
+def restart_project_tunnel(pid: int, user=Depends(current_user), db=Depends(get_db)):
+    p = own(db, user, pid)
+    url, status = restart_tunnel(p.slug)
+    p.deployment_mode = "public"
+    p.tunnel_status = status
+    if url:
+        p.public_url = url
+    db.commit()
+    return {
+        "status": status,
+        "public_url": p.public_url,
+        "deployment_mode": p.deployment_mode,
+    }
 
 
 @app.post("/api/projects/{pid}/restart")
@@ -693,8 +791,20 @@ def platform_overview(user=Depends(current_user), db=Depends(get_db)):
 
     deps = db.query(Deployment).filter(Deployment.project_id.in_(proj_ids)).order_by(Deployment.id.desc()).limit(10).all() if proj_ids else []
     
-    successful = db.query(func.count(Deployment.id)).filter(Deployment.project_id.in_(proj_ids), Deployment.status.in_(["live", "superseded"])).scalar() if proj_ids else 0
-    failed = db.query(func.count(Deployment.id)).filter(Deployment.project_id.in_(proj_ids), Deployment.status == "failed").scalar() if proj_ids else 0
+    successful = (
+        db.query(func.count(Deployment.id))
+        .filter(Deployment.project_id.in_(proj_ids), Deployment.status.in_(["live", "superseded"]))
+        .scalar()
+        if proj_ids
+        else 0
+    )
+    failed = (
+        db.query(func.count(Deployment.id))
+        .filter(Deployment.project_id.in_(proj_ids), Deployment.status == "failed")
+        .scalar()
+        if proj_ids
+        else 0
+    )
     total_deps = successful + failed
 
     proj_map = {p.id: p.name for p in projs}

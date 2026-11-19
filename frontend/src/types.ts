@@ -17,11 +17,24 @@ export interface Project {
   custom_dockerfile?: string | null;
   build_cmd?: string | null;
   start_cmd?: string | null;
+  deployment_mode?: "local" | "public";
+  public_url?: string | null;
+  tunnel_status?: "connected" | "disconnected" | "error";
   url: string;
   live_deployment?: number | null;
   latest_status: string;
   is_running: boolean;
   created_at?: string | null;
+}
+
+export interface TunnelStatus {
+  project_id: number;
+  slug: string;
+  deployment_mode: "local" | "public";
+  public_url: string | null;
+  tunnel_status: "connected" | "disconnected" | "error";
+  live_status?: string;
+  container_id?: string | null;
 }
 
 export interface Deployment {

@@ -16,6 +16,7 @@ from .db import Deployment, EnvVar, Project, SessionLocal, User, init_db
 from .detect import DEFAULT_DOCKERIGNORE, detect
 from .routing import write_route
 from .security import decrypt
+from .tunnel import start_tunnel, stop_tunnel
 
 dock = docker.from_env()
 rds = redis.Redis.from_url(settings.redis_url, decode_responses=True)
@@ -182,6 +183,28 @@ def deploy(db, dep, proj, log):
     dep.status = "live"
     live_url = f"{settings.app_scheme}://{proj.slug}.{settings.domain}{settings.url_suffix}"
     log(f"✔ Successfully live at {live_url}")
+    if getattr(proj, "deployment_mode", "local") == "public":
+        log("▶ Initializing Cloudflare Quick Tunnel for public HTTPS access...")
+        try:
+            pub_url, status = start_tunnel(proj.slug)
+            if pub_url and status == "connected":
+                proj.public_url = pub_url
+                proj.tunnel_status = "connected"
+                db.commit()
+                log(f"✔ Public HTTPS URL active: {pub_url}")
+            else:
+                proj.tunnel_status = "error"
+                db.commit()
+                log("⚠ Cloudflare tunnel initialization delayed. You can retry from project settings.")
+        except Exception as e:
+            proj.tunnel_status = "error"
+            db.commit()
+            log(f"⚠ Could not start Cloudflare tunnel: {e}")
+    else:
+        # Local mode: if a tunnel was previously running, stop it
+        stop_tunnel(proj.slug)
+        proj.tunnel_status = "disconnected"
+        db.commit()
 
 
 def process(dep_id: int):

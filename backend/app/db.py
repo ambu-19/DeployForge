@@ -37,6 +37,9 @@ class Project(Base):
     build_cmd: Mapped[str | None] = mapped_column(String(200), nullable=True)
     start_cmd: Mapped[str | None] = mapped_column(String(200), nullable=True)
     root_dir: Mapped[str] = mapped_column(String(200), default="")
+    deployment_mode: Mapped[str] = mapped_column(String(20), default="local")
+    public_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tunnel_status: Mapped[str] = mapped_column(String(20), default="disconnected")
 
 
 class EnvVar(Base):
@@ -72,6 +75,9 @@ def init_db():
             ("build_cmd", "VARCHAR(200)"),
             ("start_cmd", "VARCHAR(200)"),
             ("root_dir", "VARCHAR(200) DEFAULT ''"),
+            ("deployment_mode", "VARCHAR(20) DEFAULT 'local'"),
+            ("public_url", "VARCHAR(255)"),
+            ("tunnel_status", "VARCHAR(20) DEFAULT 'disconnected'"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE projects ADD COLUMN IF NOT EXISTS {col} {col_type};"))

@@ -3,6 +3,8 @@ import {
   AlertTriangle,
   ExternalLink,
   GitBranch,
+  Globe,
+  Laptop,
   Layers,
   Play,
   Plus,
@@ -156,7 +158,20 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       <span className="truncate max-w-[200px]">{p.repo}@{p.branch}</span>
                     </div>
                   </div>
-                  <Badge status={p.latest_status || (p.is_running ? "live" : "stopped")} size="sm" />
+                  <div className="flex items-center gap-1.5">
+                    {p.deployment_mode === "public" ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>Public</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-medium flex items-center gap-1">
+                        <Laptop className="w-2.5 h-2.5" />
+                        <span>Local</span>
+                      </span>
+                    )}
+                    <Badge status={p.latest_status || (p.is_running ? "live" : "stopped")} size="sm" />
+                  </div>
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5 text-xs">
@@ -177,18 +192,33 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-slate-400">
-                    <span>Domain</span>
+                    <span>Local URL</span>
                     <a
                       href={p.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-mono text-[11px]"
+                      className="text-sky-400 hover:text-sky-300 flex items-center gap-1 font-mono text-[11px]"
                     >
                       <span className="truncate max-w-[150px]">{p.slug}.localhost</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
+                  {p.public_url && (
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Public HTTPS</span>
+                      <a
+                        href={p.public_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-mono text-[11px]"
+                      >
+                        <span className="truncate max-w-[150px]">{p.public_url.replace("https://", "")}</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
 

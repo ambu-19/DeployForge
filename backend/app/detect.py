@@ -5,7 +5,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 DEFAULT_DOCKERIGNORE = """.git
 .gitignore
@@ -851,7 +851,6 @@ def scan_repository(root_path: Path, max_depth: int = 4) -> List[Dict[str, Any]]
     """Recursively scan repository directory for deployable applications up to max_depth."""
     root = Path(root_path).resolve()
     detected_apps: List[Dict[str, Any]] = []
-    visited_dirs = set()
 
     for dirpath, dirnames, _ in os.walk(root):
         cur_path = Path(dirpath).resolve()

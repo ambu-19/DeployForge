@@ -9,6 +9,8 @@ import {
   FileCode,
   FolderGit2,
   GitBranch,
+  Globe,
+  Laptop,
   Layers,
   Loader2,
   RefreshCw,
@@ -55,6 +57,7 @@ export const NewProjectWizard: React.FC<NewProjectWizardProps> = ({
   const [templates, setTemplates] = useState<FrameworkTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState("react-vite");
   const [deploying, setDeploying] = useState(false);
+  const [deploymentMode, setDeploymentMode] = useState<"local" | "public">("local");
   const [errorMsg, setErrorMsg] = useState("");
 
   // Load GitHub repos and templates on mount
@@ -184,6 +187,7 @@ export const NewProjectWizard: React.FC<NewProjectWizardProps> = ({
         custom_dockerfile: dockerfileContent,
         build_cmd: detection?.build_command,
         start_cmd: detection?.start_command,
+        deployment_mode: deploymentMode,
       });
       onCreated(proj.id);
     } catch (e: any) {
@@ -595,6 +599,105 @@ export const NewProjectWizard: React.FC<NewProjectWizardProps> = ({
                 <p className="text-[10px] text-slate-500">
                   HTTP GET endpoint evaluated by Traefik before traffic cutover.
                 </p>
+              </div>
+
+              {/* DEPLOYMENT MODE SELECTION */}
+              <div className="space-y-3 pt-3 border-t border-slate-800 md:col-span-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                      <Globe className="w-4 h-4 text-indigo-400" />
+                      <span>Choose Deployment Mode</span>
+                    </label>
+                    <p className="text-[11px] text-slate-400">
+                      Deploy locally on Docker + Traefik, or publish to the internet with a free Cloudflare HTTPS Tunnel.
+                    </p>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium inline-block self-start sm:self-auto">
+                    100% Free • No Cloud Cost
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  {/* Local Deployment Card */}
+                  <div
+                    onClick={() => setDeploymentMode("local")}
+                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                      deploymentMode === "local"
+                        ? "bg-indigo-600/10 border-indigo-500/50 ring-1 ring-indigo-500/30"
+                        : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+                          <Laptop className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-200">Local Deployment</h4>
+                          <span className="text-[10px] text-sky-400 font-mono">http://&lt;slug&gt;.localhost:8080</span>
+                        </div>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          deploymentMode === "local" ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-700"
+                        }`}
+                      >
+                        {deploymentMode === "local" && <Check className="w-2.5 h-2.5" />}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-2.5 leading-relaxed">
+                      Fast, isolated execution on local Docker Engine with Traefik routing. Private to this machine with zero network latency.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">Docker Engine</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">Traefik Proxy</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">Private Host</span>
+                    </div>
+                  </div>
+
+                  {/* Public Deployment (Cloudflare Tunnel) Card */}
+                  <div
+                    onClick={() => setDeploymentMode("public")}
+                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                      deploymentMode === "public"
+                        ? "bg-emerald-600/10 border-emerald-500/50 ring-1 ring-emerald-500/30"
+                        : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                          <Globe className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="text-xs font-bold text-slate-200">Public Deployment</h4>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                              Free Tunnel
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-emerald-400 font-mono">https://*.trycloudflare.com</span>
+                        </div>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          deploymentMode === "public" ? "border-emerald-500 bg-emerald-600 text-white" : "border-slate-700"
+                        }`}
+                      >
+                        {deploymentMode === "public" && <Check className="w-2.5 h-2.5" />}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-2.5 leading-relaxed">
+                      Instant, free public HTTPS access via Cloudflare Quick Tunnel. Perfect for sharing with clients, mobile testing, webhooks, and demos.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/40 font-medium">Free HTTPS</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">Cloudflare Tunnel</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">No Account Needed</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import {
   MonitoringData,
   OverviewStats,
   Project,
+  TunnelStatus,
   User,
 } from "./types";
 
@@ -119,6 +120,21 @@ export const api = {
     request<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteProject: (id: number) => request<void>(`/projects/${id}`, { method: "DELETE" }),
   deployProject: (id: number) => request<{ id: number }>(`/projects/${id}/deploy`, { method: "POST" }),
+  deployLocal: (id: number) =>
+    request<{ id: number; deployment_mode: string }>(`/projects/${id}/deploy/local`, { method: "POST" }),
+  deployPublic: (id: number) =>
+    request<{ id: number; deployment_mode: string }>(`/projects/${id}/deploy/public`, { method: "POST" }),
+  getTunnelStatus: (id: number) => request<TunnelStatus>(`/projects/${id}/tunnel`),
+  startTunnel: (id: number) =>
+    request<{ status: string; public_url: string | null; deployment_mode: string }>(`/projects/${id}/tunnel/start`, {
+      method: "POST",
+    }),
+  stopTunnel: (id: number) =>
+    request<{ stopped: boolean; tunnel_status: string }>(`/projects/${id}/tunnel/stop`, { method: "POST" }),
+  restartTunnel: (id: number) =>
+    request<{ status: string; public_url: string | null; deployment_mode: string }>(`/projects/${id}/tunnel/restart`, {
+      method: "POST",
+    }),
   restartProject: (id: number) => request<{ restarted: boolean }>(`/projects/${id}/restart`, { method: "POST" }),
   stopProject: (id: number) => request<{ stopped: boolean }>(`/projects/${id}/stop`, { method: "POST" }),
   getProjectStats: (id: number) => request<any>(`/projects/${id}/stats`),
